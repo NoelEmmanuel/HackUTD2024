@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import time
 import plotly.graph_objs as go
+from Samba import check_hydrate_formation
 
 # Title of the app
 st.title("Simultaneous Live Data Streaming with Threshold Markers and Start/Stop Feature")
@@ -36,6 +37,12 @@ if 'current_indices' not in st.session_state:
     st.session_state.current_indices = {}
 if 'run' not in st.session_state:
     st.session_state.run = False
+if 'confidence_sum' not in st.session_state:
+    st.session_state.confidence_sum = {}
+if 'confidence_count' not in st.session_state:
+    st.session_state.confidence_count = {}
+if 'highest_confidence' not in st.session_state:
+    st.session_state.highest_confidence = {}
 
 # File uploaders for multiple CSV files
 uploaded_files = st.file_uploader(
@@ -126,6 +133,38 @@ if st.session_state.uploaded_files:
 
         # Limit to the last max_entries data points
         chunk_data = chunk_data.tail(max_entries)
+
+        # **Update Running Metrics**
+        if file_name not in st.session_state.confidence_sum:
+            # Initialize for each file
+            st.session_state.confidence_sum[file_name] = 0
+            st.session_state.confidence_count[file_name] = 0
+            st.session_state.highest_confidence[file_name] = 0
+
+        # Get current confidence score (from current chunk)
+        if not chunk_data.empty:
+            current_confidence = chunk_data['Confidence_Score'].iloc[-1]
+        
+            # Update running sum and count
+            st.session_state.confidence_sum[file_name] += chunk_data['Confidence_Score'].sum()
+            st.session_state.confidence_count[file_name] += len(chunk_data)
+
+            # Calculate Metrics
+            if st.session_state.confidence_count[file_name] > 0:
+                average_confidence = st.session_state.confidence_sum[file_name] / st.session_state.confidence_count[file_name]
+                
+                # Update highest confidence score
+                max_confidence_in_chunk = chunk_data['Confidence_Score'].max()
+                st.session_state.highest_confidence[file_name] = max(
+                    st.session_state.highest_confidence[file_name],
+                    max_confidence_in_chunk
+                )
+                highest_confidence = st.session_state.highest_confidence[file_name]
+
+                # Check if current confidence exceeds average/highest ratio
+                if highest_confidence > 0 and current_confidence > (average_confidence / highest_confidence):
+                    hydrate_status = check_hydrate_formation(current_confidence)
+                    st.warning(f"Hydrate Formation Alert for {file_name}: {hydrate_status}")
 
         # Plot using Plotly with threshold markers
         exceeded_points = chunk_data[chunk_data['Confidence_Score'] > threshold]
