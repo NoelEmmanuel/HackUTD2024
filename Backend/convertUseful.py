@@ -1,6 +1,6 @@
 import pandas as pd
 
-def process_csv(file_path, output_path):
+def process_csv1(file_path, output_path):
     # Load the dataset
     data = pd.read_csv(file_path)
     
@@ -8,7 +8,7 @@ def process_csv(file_path, output_path):
     data['Time'] = pd.to_datetime(data['Time'],format='%m/%d/%Y %I:%M:%S %p', errors='coerce')
     
     #This is whether the hydrate is forming or not (manually input)
-    # data['IsHydrate'] = 0
+    data['IsHydrate'] = 0
 
     # Drop the original 'Time' column (optional)
     # data = data.drop(columns=['Time'])
@@ -20,6 +20,7 @@ def process_csv(file_path, output_path):
     
     # Save the processed data to a new file
     data.to_csv(output_path, index=False)
+    return output_path
     print(f"Processed file saved to: {output_path}")
 
 # # File paths

@@ -8,7 +8,7 @@ import joblib
 # List of CSV files to use for training
 training_files = [
     f'C:/Users/noele/Documents/GitHub/HackUTD2024/Backend/Datasets/Bold_v2_5_with_history.csv',
-    f'C:/Users/noele/Documents/GitHub/HackUTD2024/Backend/Datasets/Steadfast_v2_5_with_history.csv',
+    f'C:/Users/noele/Documents/GitHub/HackUTD2024/Backend/Datasets/Fearless_v2_5_with_history.csv',
     f'C:/Users/noele/Documents/GitHub/HackUTD2024/Backend/Datasets/Courageous_v2_5_with_history.csv',
     f'C:/Users/noele/Documents/GitHub/HackUTD2024/Backend/Datasets/Ruthless_v2_5_with_history.csv',
     f'C:/Users/noele/Documents/GitHub/HackUTD2024/Backend/Datasets/Valiant_v2_5_with_history.csv',

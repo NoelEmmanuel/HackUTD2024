@@ -1,10 +1,20 @@
+import sys
+import os
+
+# Add the parent directory of Backend to sys.path
+parent_dir = os.path.abspath("C:/Users/noele/Documents/GitHub/HackUTD2024")
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
 import streamlit as st
 import pandas as pd
 import time
 import plotly.graph_objs as go
+import importlib.util
+from Backend import csvToUsable
 
 # Title of the app
-st.title("Simultaneous Live Data Streaming with Threshold Markers and Start/Stop Feature")
+st.title("Live Data Streaming with Single File Upload and External Script Call")
 
 # Streamlit slider for chunk size
 chunk_size = st.slider(
@@ -28,8 +38,6 @@ max_entries = st.slider(
 threshold = st.slider("Set Confidence Score Threshold", min_value=0.0, max_value=1.0, value=0.7, step=0.01)
 
 # Initialize session state
-if 'uploaded_files' not in st.session_state:
-    st.session_state.uploaded_files = []
 if 'file_data' not in st.session_state:
     st.session_state.file_data = {}
 if 'current_indices' not in st.session_state:
@@ -37,49 +45,57 @@ if 'current_indices' not in st.session_state:
 if 'run' not in st.session_state:
     st.session_state.run = False
 
-# File uploaders for multiple CSV files
-uploaded_files = st.file_uploader(
-    "Upload your CSV files",
+# External script path
+external_script_path = 'C:/Users/noele/Documents/GitHub/HackUTD2024/Backend/csvToUsable.py'
+
+# File uploader for a single CSV file
+uploaded_file = st.file_uploader(
+    "Upload a single CSV file",
     type=["csv"],
-    accept_multiple_files=True
+    accept_multiple_files=False
 )
 
-# If new files are uploaded, update session state
-if uploaded_files:
-    new_files = [
-        file for file in uploaded_files if file not in st.session_state.uploaded_files
-    ]
-    if new_files:
-        for file in new_files:
-            # Load data
-            data = pd.read_csv(file)
+# Process the uploaded file
+if uploaded_file:
+    # Save uploaded file to a temporary location
+    temp_file_path = os.path.join('C:/Users/noele/Documents/GitHub/HackUTD2024/Backend', uploaded_file.name)
+    with open(temp_file_path, "wb") as temp_file:
+        temp_file.write(uploaded_file.getbuffer())
+    print(uploaded_file.name)
+    average = csvToUsable.process_uploaded_file(uploaded_file.name, temp_file_path)
 
-            # Ensure the selected columns exist in the dataset
-            required_columns = ['Time', 'Inj Gas Meter Volume Instantaneous', 'Confidence_Score']
-            if not all(col in data.columns for col in required_columns):
-                st.error(
-                    f"The file '{file.name}' must contain the following columns: {', '.join(required_columns)}"
-                )
-                continue
+    # Call the external script
+    temp_file_path = 'C:/Users/noele/Documents/GitHub/HackUTD2024/Backend/Datasets/{name}_FINAL.csv'
 
-            # Filter for the required columns
-            data = data[required_columns]
+    # Load data
+    print(temp_file_path)
+    data = pd.read_csv(temp_file_path)
 
-            # Convert 'Time' column to datetime for better plotting
-            data['Time'] = pd.to_datetime(data['Time'], errors='coerce')
+    # Ensure the selected columns exist in the dataset
+    required_columns = ['Time', 'Inj Gas Meter Volume Instantaneous', 'Confidence_Score']
+    if not all(col in data.columns for col in required_columns):
+        st.error(
+            f"The file '{uploaded_file.name}' must contain the following columns: {', '.join(required_columns)}"
+        )
+    else:
+        # Filter for the required columns
+        data = data[required_columns]
 
-            # Store data in session state
-            st.session_state.file_data[file.name] = data
-            st.session_state.current_indices[file.name] = 0
+        # Convert 'Time' column to datetime for better plotting
+        data['Time'] = pd.to_datetime(data['Time'], errors='coerce')
 
-        # Update the list of uploaded files
-        st.session_state.uploaded_files = uploaded_files
+        # Store data in session state
+        st.session_state.file_data[uploaded_file.name] = data
+        st.session_state.current_indices[uploaded_file.name] = 0
+
+        # Confirm file upload
+        st.success(f"File '{uploaded_file.name}' has been uploaded and processed.")
 
 # Start/Stop button
 if st.button('Start/Stop Data Streaming'):
     st.session_state.run = not st.session_state.run
 
-if st.session_state.uploaded_files:
+if st.session_state.file_data:
     # Layout to organize multiple graphs
     max_columns = 2  # Maximum number of graphs per row
     col_index = 0    # To track column position in the current row
@@ -89,8 +105,8 @@ if st.session_state.uploaded_files:
     graph_placeholders = {}
 
     # Display graphs for each uploaded file
-    for idx, file in enumerate(st.session_state.uploaded_files):
-        file_name = file.name
+    for file_name, data in st.session_state.file_data.items():
+        current_index = st.session_state.current_indices[file_name]
 
         # Create new row of columns if the current row is full
         if col_index == 0:
@@ -107,68 +123,53 @@ if st.session_state.uploaded_files:
         if col_index >= max_columns:
             col_index = 0
 
-    # For each file, display/update the graph
-    for file_name in st.session_state.file_data:
-        data = st.session_state.file_data[file_name]
-        current_index = st.session_state.current_indices[file_name]
-
-        if st.session_state.run:
-            # Update the current index
+    # Continuous update while `st.session_state.run` is True
+    while st.session_state.run:
+        for file_name, data in st.session_state.file_data.items():
+            current_index = st.session_state.current_indices[file_name]
             next_index = current_index + chunk_size
-            if next_index >= len(data):
-                next_index = len(data)  # Stop at the end
+            next_index = min(next_index, len(data))  # Stop at the end
+
+            # Update session state
             st.session_state.current_indices[file_name] = next_index
-        else:
-            next_index = current_index  # Keep current index when paused
 
-        # Subset the data up to the current index
-        chunk_data = data.iloc[:next_index]
+            # Subset data for the graph
+            chunk_data = data.iloc[:next_index].tail(max_entries)
 
-        # Limit to the last max_entries data points
-        chunk_data = chunk_data.tail(max_entries)
-
-        # Plot using Plotly with threshold markers
-        exceeded_points = chunk_data[chunk_data['Confidence_Score'] > threshold]
-        fig = go.Figure()
-
-        # Add the main line chart
-        fig.add_trace(
-            go.Scatter(
-                x=chunk_data["Time"],
-                y=chunk_data["Inj Gas Meter Volume Instantaneous"],
-                mode="lines",
-                line=dict(color="blue"),
-            )
-        )
-
-        # Add red markers for threshold exceedances
-        if not exceeded_points.empty:
+            # Plot using Plotly
+            fig = go.Figure()
             fig.add_trace(
                 go.Scatter(
-                    x=exceeded_points["Time"],
-                    y=exceeded_points["Inj Gas Meter Volume Instantaneous"],
-                    mode="markers",
-                    marker=dict(color="red", size=10, symbol="circle"),
+                    x=chunk_data["Time"],
+                    y=chunk_data["Inj Gas Meter Volume Instantaneous"],
+                    mode="lines",
+                    line=dict(color="blue"),
                 )
             )
 
-        fig.update_layout(
-            title="Inj Gas Volume vs Time with Threshold Markers",
-            xaxis_title="Time",
-            yaxis_title="Inj Gas Meter Volume Instantaneous",
-            height=300,  # Reduced height to make graphs more compact
-            margin=dict(l=20, r=20, t=30, b=20),  # Adjusted margins for a cleaner layout
-            showlegend=False,  # Remove legend
-        )
+            exceeded_points = chunk_data[chunk_data['Confidence_Score'] > threshold]
+            if not exceeded_points.empty:
+                fig.add_trace(
+                    go.Scatter(
+                        x=exceeded_points["Time"],
+                        y=exceeded_points["Inj Gas Meter Volume Instantaneous"],
+                        mode="markers",
+                        marker=dict(color="red", size=10),
+                    )
+                )
 
-        # Update the graph with a unique key
-        graph_placeholders[file_name].plotly_chart(fig, use_container_width=True, key=file_name)
+            fig.update_layout(
+                title="Inj Gas Volume vs Time with Threshold Markers",
+                xaxis_title="Time",
+                yaxis_title="Inj Gas Meter Volume Instantaneous",
+                height=400,
+                margin=dict(l=20, r=20, t=30, b=20),
+                showlegend=False,
+            )
 
-    if st.session_state.run:
-        # Pause for a short duration to simulate real-time updates
-        time.sleep(1.0)
-        st.rerun()
-    else:
-        st.write("Click 'Start/Stop Data Streaming' to resume or pause the live graphs.")
+            # Update the graph
+            graph_placeholders[file_name].plotly_chart(fig, use_container_width=True, key=f"{file_name}_{current_index}")
+
+        time.sleep(1.0)  # Simulate real-time streaming
 else:
-    st.write("Please upload CSV files to begin.")
+    st.write("Please upload a CSV file to begin.")
