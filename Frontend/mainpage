@@ -1,138 +1,98 @@
 import streamlit as st
-import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import time
-import matplotlib.dates as mdates
+
+# Define status emojis
+status_emojis = {
+    'green': '🟢',
+    'yellow': '🟡',
+    'red': '🔴',
+}
+
+# Main menu options with their statuses
+menu_options = {
+    'Home': 'green',
+    'Wells': 'yellow',
+}
+
+# Wells and their statuses
+wells = ['Well A', 'Well B', 'Well C']
+wells_status = {
+    'Well A': 'green',
+    'Well B': 'green',
+    'Well C': 'red',
+}
+
+def simulate_data():
+    new_data = {"Time": time.time(), "Value": np.random.randn()}
+    return new_data
+
+# Initialize session state variables
+if 'well_data' not in st.session_state:
+    st.session_state.well_data = {well: pd.DataFrame(columns=['Time', 'Value']) for well in wells}
+
+if 'run' not in st.session_state:
+    st.session_state.run = False
+
+# Create main menu with status emojis
+menu_labels = [f"{status_emojis[status]} {name}" for name, status in menu_options.items()]
+selected_main = st.sidebar.radio("Main Menu", menu_labels)
+selected_main = selected_main.split(' ', 1)[1]  # Remove the emoji to get the actual name
+
+# Handle navigation
+if selected_main == 'Home':
+    st.write("Welcome to the Home page.")
+    if st.button("Start/Stop"):
+        st.session_state.run = not st.session_state.run
+    for well in wells:
+        graph_placeholder = st.empty()
+        
+    def update_graph(well):
+        new_data = simulate_data()
+        st.session_state.well_data[well] = pd.concat(
+    [st.session_state.well_data[well], pd.DataFrame([new_data])], ignore_index=True)
+    st.session_state.well_data[well] = st.session_state.well_data[well].tail(10)
+    graph_placeholder.line_chart(st.session_state.well_data[well]['Value'])
+
+    if st.session_state.run:
+        for well in wells:
+            update_graph(well)
+        time.sleep(1)  # Wait for 1 second
+        st.rerun()
+    else:
+        st.write("Click 'Start/Stop' to begin real-time updates.")
 
 
-# Simulate real-time data update
-def generate_real_time_data():
-    # Simulate a time series of data with random values
-    current_time = pd.to_datetime("now")
-    gas_injection = np.random.uniform(90, 110)  # Random gas injection volume
-    target_gas_injection = 100  # Constant target value
-    deviation = gas_injection - target_gas_injection  # Deviation from target
-    return current_time, gas_injection, deviation
+elif selected_main == 'Wells':
+    # Create wells dropdown with status emojis
+    well_labels = [f"{status_emojis[wells_status[well]]} {well}" for well in wells]
+    selected_well_label = st.sidebar.selectbox("Select a Well", well_labels)
+    selected_well = selected_well_label.split(' ', 1)[1]  # Remove the emoji
 
+    st.write(f"You selected {selected_well}")
 
-# Streamlit app
-def real_time_dashboard():
-    st.title("Real-Time Data Processing Dashboard")
+    # Start/Stop button
+    if st.button('Start/Stop'):
+        st.session_state.run = not st.session_state.run
 
-    # Create a container for the plot to be updated in real-time
-    plot_placeholder = st.empty()
+    # Placeholder for the graph
+    graph_placeholder = st.empty()
 
-    # Initialize data
-    time_series = []
-    deviation_series = []
+    # Function to update the graph
+    def update_graph(well):
+        new_data = simulate_data()
+        st.session_state.well_data[well] = pd.concat(
+    [st.session_state.well_data[well], pd.DataFrame([new_data])], ignore_index=True
+)
+        # Limit data to last 100 points
+        st.session_state.well_data[well] = st.session_state.well_data[well].tail(20)
+        # Update the graph
+        graph_placeholder.line_chart(st.session_state.well_data[well]['Value'])
 
-    # Start real-time updates
-    run_dashboard = st.checkbox("Run Dashboard", value=True)
-
-    while run_dashboard:
-        # Generate new data point
-        current_time, _, deviation = generate_real_time_data()
-
-        # Append new data to the lists
-        time_series.append(current_time)
-        deviation_series.append(deviation)
-
-        # Update the plot in real-time
-        fig, ax = plt.subplots()
-        ax.plot(time_series, deviation_series, marker='o', color='red')
-        ax.set_title('Gas Injection Deviation Over Time')
-        ax.set_xlabel('Time')
-        ax.set_ylabel('Deviation (m³)')
-
-        # Set the x-axis to format the time properly
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))  # Hour:Minute:Second format
-        ax.xaxis.set_major_locator(mdates.SecondLocator(interval=10))  # Set interval for ticks (e.g., every 10 seconds)
-
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-
-        # Display the updated plot
-        plot_placeholder.pyplot(fig)
-
-        # Wait a short time (e.g., 1 second) before updating the graph again
-        time.sleep(4)
-
-        # Check if the checkbox is still active
-        run_dashboard = st.checkbox("Run Dashboard", value=True)
-
-
-def home_page():
-    st.title("HydraSense")
-    st.write("This is the home section of the page.")
-
-
-def analytics_page():
-    st.title("Analytics Page")
-    st.sidebar.write("This is the sidebar content for the Analytics Page.")
-    real_time_dashboard()  # Embed the dashboard here
-
-
-def real_time_page():
-    st.title("Real-Time Page")
-    st.write("This is the Real-Time page.")
-
-def prediction_page():
-    st.title("Prediction Page")
-    st.write("This is the Prediction page.")
-
-import streamlit as st
-
-def real_time_page():
-    st.title("Real-Time Page")
-    st.write("This is the Real-Time page.")
-
-def prediction_page():
-    st.title("Prediction Page")
-    st.write("This is the Prediction page.")
-
-def main():
-    # Initialize session state to track the current page
-    if "current_page" not in st.session_state:
-        st.session_state.current_page = "Real-Time"  # Default page
-
-    # Sidebar for navigation
-    st.sidebar.title("Menu")
-
-
-
-    # Provide unique keys for the buttons
-    if st.sidebar.button("🏠Home", key="home"):
-        st.session_state.current_page = "Home"
-
-
-    wells = ["Well 1", "Well 2", "Well 3", "Well 4", "Well 5", "Well 6", "Well 7", "Well 8"]
-    circle_html = """
-        <style>
-            .circle {
-                width: 10px;
-                height: 10px;
-                border-radius: 50%;
-                background-color: red;
-                display: inline-block;
-                margin-right: 10px;
-            }
-        </style>
-        """
-    st.sidebar.markdown(circle_html, unsafe_allow_html=True)
-
-    # Create a list of wells with circles
-    wells_with_circles = [f'<div><span class="circle"></span>{well}</div>' for well in wells]
-
-
-    selected_well = st.sidebar.selectbox("Wells", wells)
-
-    # Display the selected well
-    st.sidebar.write(f"Selected Well: {selected_well}")
-
-
-    # Display the selected page
-    home_page()
-
-if __name__ == "__main__":
-    main()
+    if st.session_state.run:
+        update_graph(selected_well)
+        time.sleep(1)  # Wait for 1 second
+        st.rerun()
+    else:
+        st.write("Click 'Start/Stop' to begin real-time updates.")
