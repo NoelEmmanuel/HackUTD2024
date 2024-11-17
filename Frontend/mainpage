@@ -1,0 +1,138 @@
+import streamlit as st
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import time
+import matplotlib.dates as mdates
+
+
+# Simulate real-time data update
+def generate_real_time_data():
+    # Simulate a time series of data with random values
+    current_time = pd.to_datetime("now")
+    gas_injection = np.random.uniform(90, 110)  # Random gas injection volume
+    target_gas_injection = 100  # Constant target value
+    deviation = gas_injection - target_gas_injection  # Deviation from target
+    return current_time, gas_injection, deviation
+
+
+# Streamlit app
+def real_time_dashboard():
+    st.title("Real-Time Data Processing Dashboard")
+
+    # Create a container for the plot to be updated in real-time
+    plot_placeholder = st.empty()
+
+    # Initialize data
+    time_series = []
+    deviation_series = []
+
+    # Start real-time updates
+    run_dashboard = st.checkbox("Run Dashboard", value=True)
+
+    while run_dashboard:
+        # Generate new data point
+        current_time, _, deviation = generate_real_time_data()
+
+        # Append new data to the lists
+        time_series.append(current_time)
+        deviation_series.append(deviation)
+
+        # Update the plot in real-time
+        fig, ax = plt.subplots()
+        ax.plot(time_series, deviation_series, marker='o', color='red')
+        ax.set_title('Gas Injection Deviation Over Time')
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Deviation (m³)')
+
+        # Set the x-axis to format the time properly
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))  # Hour:Minute:Second format
+        ax.xaxis.set_major_locator(mdates.SecondLocator(interval=10))  # Set interval for ticks (e.g., every 10 seconds)
+
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+
+        # Display the updated plot
+        plot_placeholder.pyplot(fig)
+
+        # Wait a short time (e.g., 1 second) before updating the graph again
+        time.sleep(4)
+
+        # Check if the checkbox is still active
+        run_dashboard = st.checkbox("Run Dashboard", value=True)
+
+
+def home_page():
+    st.title("HydraSense")
+    st.write("This is the home section of the page.")
+
+
+def analytics_page():
+    st.title("Analytics Page")
+    st.sidebar.write("This is the sidebar content for the Analytics Page.")
+    real_time_dashboard()  # Embed the dashboard here
+
+
+def real_time_page():
+    st.title("Real-Time Page")
+    st.write("This is the Real-Time page.")
+
+def prediction_page():
+    st.title("Prediction Page")
+    st.write("This is the Prediction page.")
+
+import streamlit as st
+
+def real_time_page():
+    st.title("Real-Time Page")
+    st.write("This is the Real-Time page.")
+
+def prediction_page():
+    st.title("Prediction Page")
+    st.write("This is the Prediction page.")
+
+def main():
+    # Initialize session state to track the current page
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = "Real-Time"  # Default page
+
+    # Sidebar for navigation
+    st.sidebar.title("Menu")
+
+
+
+    # Provide unique keys for the buttons
+    if st.sidebar.button("🏠Home", key="home"):
+        st.session_state.current_page = "Home"
+
+
+    wells = ["Well 1", "Well 2", "Well 3", "Well 4", "Well 5", "Well 6", "Well 7", "Well 8"]
+    circle_html = """
+        <style>
+            .circle {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background-color: red;
+                display: inline-block;
+                margin-right: 10px;
+            }
+        </style>
+        """
+    st.sidebar.markdown(circle_html, unsafe_allow_html=True)
+
+    # Create a list of wells with circles
+    wells_with_circles = [f'<div><span class="circle"></span>{well}</div>' for well in wells]
+
+
+    selected_well = st.sidebar.selectbox("Wells", wells)
+
+    # Display the selected well
+    st.sidebar.write(f"Selected Well: {selected_well}")
+
+
+    # Display the selected page
+    home_page()
+
+if __name__ == "__main__":
+    main()
